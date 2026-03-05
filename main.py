@@ -72,5 +72,7 @@ async def startup_event():
     asyncio.create_task(run_scraper())
 
 @app.get("/")
-def read_root():
+@app.head("/") # This fixes the '405 Method Not Allowed' error
+async def read_root():
     return {"status": "Bot is running"}
+

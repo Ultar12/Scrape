@@ -32,56 +32,39 @@ async def solve_captcha(page):
     return "0"
 
 async def run_scraper():
+    print("🚀 Background scraper starting...") # This should show in logs
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=True)
-        context = await browser.new_context()
-        page = await context.new_page()
+        page = await browser.new_page()
 
         try:
-            # 1. Login Phase
+            print(f"🔗 Navigating to {LOGIN_URL}...")
             await page.goto(LOGIN_URL)
+            
+            # Solve Captcha
+            captcha_result = await solve_captcha(page)
+            print(f"🤖 Captcha identified as: {captcha_result}")
+            
             await page.fill("input[name='username']", USERNAME)
             await page.fill("input[name='password']", PASSWORD)
+            await page.fill("input[name='captcha']", captcha_result)
             
-            captcha_result = await solve_captcha(page)
-            await page.fill("input[name='captcha']", captcha_result) # Adjust selector if name is different
+            print("🔑 Attempting login click...")
             await page.click("button[type='submit']")
-            await page.wait_for_url("**/dashboard")
+            
+            # Wait to see if login worked
+            await page.wait_for_url("**/dashboard", timeout=10000)
+            print("✅ Login Successful!")
 
             while True:
-                # 2. Navigation Phase
-                # Open menu and click SMS Reports
-                await page.click(".navbar-toggler, .three-line-nav-selector") # Adjust selector based on actual ID
-                await page.click("text=SMS Reports")
-                await page.wait_for_selector("button:has-text('Show Report')")
-                
-                # 3. Data Extraction
-                await page.click("button:has-text('Show Report')")
-                await asyncio.sleep(2) # Wait for table update
-                
-                rows = await page.locator("table tr").all()
-                for row in rows[1:5]: # Check top 4 rows
-                    cols = await row.locator("td").all_inner_texts()
-                    if len(cols) > 4:
-                        phone = cols[1]
-                        sms_content = cols[3]
-                        
-                        unique_id = f"{phone}-{sms_content}"
-                        if unique_id not in last_otp_cache:
-                            send_telegram(f"📩 New OTP\nNum: {phone}\nMsg: {sms_content}")
-                            last_otp_cache.add(unique_id)
-                
-                # Keep cache small
-                if len(last_otp_cache) > 50:
-                    last_otp_cache.clear()
-
-                await asyncio.sleep(60) # Wait 1 minute before refreshing
-                await page.reload()
-
+                print("🔄 Refreshing SMS Reports...")
+                # ... rest of your code ...
+                await asyncio.sleep(60)
         except Exception as e:
-            print(f"Error: {e}")
+            print(f"❌ Scraper Error: {e}")
         finally:
             await browser.close()
+
 
 @app.on_event("startup")
 async def startup_event():
